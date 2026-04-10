@@ -4,25 +4,19 @@ using UnityEngine;
 
 public enum TurnPhase { Draw, Play, Submit, End }
 
-/// <summary>
-/// 回合状态机：驱动4名玩家轮流行动
-/// </summary>
 public class TurnManager : MonoBehaviour
 {
     public static TurnManager Instance { get; private set; }
 
-    [Header("AI出牌延迟（秒）")]
     [SerializeField] private float aiDelay = 1.0f;
 
     public int CurrentPlayerIndex { get; private set; } = 0;
     public TurnPhase CurrentPhase { get; private set; } = TurnPhase.Draw;
     public bool IsLocalPlayerTurn => CurrentPlayerIndex == 0;
 
-    // 当前回合桌面上的牌
     private List<CardInstance> _tableCards = new List<CardInstance>();
     public IReadOnlyList<CardInstance> TableCards => _tableCards;
 
-    // 当前玩家是否已摸牌
     private bool _hasDrawnThisPhase = false;
 
     private void Awake()
@@ -37,17 +31,14 @@ public class TurnManager : MonoBehaviour
         StartTurn();
     }
 
-    // ── 回合开始 ──────────────────────────────────────────────────────────────
-
     private void StartTurn()
     {
         var player = GameManager.Instance.Players[CurrentPlayerIndex];
 
-        // 跳过回合处理
         if (player.SkipNextTurn)
         {
             player.SkipNextTurn = false;
-            UIManager.Instance.ShowMessage($"{player.PlayerName} 跳过本回合");
+            UIManager.Instance.ShowMessage($"{player.PlayerName} skipped turn");
             EndTurn();
             return;
         }
@@ -63,8 +54,6 @@ public class TurnManager : MonoBehaviour
         EnterDrawPhase();
     }
 
-    // ── 摸牌阶段 ──────────────────────────────────────────────────────────────
-
     private void EnterDrawPhase()
     {
         CurrentPhase = TurnPhase.Draw;
@@ -72,18 +61,15 @@ public class TurnManager : MonoBehaviour
 
         var player = GameManager.Instance.Players[CurrentPlayerIndex];
 
-        // 摸一张牌
         var card = DeckManager.Instance.DrawCard();
         if (card != null)
         {
             player.Hand.AddCard(card);
-            UIManager.Instance.ShowMessage($"{player.PlayerName} 摸了一张牌");
+            UIManager.Instance.ShowMessage($"{player.PlayerName} drew a card");
         }
 
         EnterPlayPhase();
     }
-
-    // ── 出牌阶段 ──────────────────────────────────────────────────────────────
 
     private void EnterPlayPhase()
     {
@@ -91,7 +77,7 @@ public class TurnManager : MonoBehaviour
 
         if (IsLocalPlayerTurn)
         {
-            UIManager.Instance.ShowMessage("请出牌，或点击[结束出牌]");
+            UIManager.Instance.ShowMessage("Play a card or click End Play");
             GameUI.Instance?.SetPlayButtons(true);
         }
         else
@@ -101,7 +87,6 @@ public class TurnManager : MonoBehaviour
         }
     }
 
-    /// <summary>玩家点击"打出选中卡"按钮</summary>
     public void PlayerPlayCard()
     {
         if (!IsLocalPlayerTurn || CurrentPhase != TurnPhase.Play) return;
@@ -109,14 +94,13 @@ public class TurnManager : MonoBehaviour
         var card = HandView.Instance.ConsumeSelected();
         if (card == null)
         {
-            UIManager.Instance.ShowMessage("请先选择一张牌");
+            UIManager.Instance.ShowMessage("Select a card first");
             return;
         }
 
         PlayCardToTable(GameManager.Instance.LocalPlayer, card);
     }
 
-    /// <summary>玩家点击"结束出牌"按钮</summary>
     public void PlayerEndPlay()
     {
         if (!IsLocalPlayerTurn || CurrentPhase != TurnPhase.Play) return;
@@ -128,10 +112,8 @@ public class TurnManager : MonoBehaviour
         player.Hand.RemoveCard(card);
         _tableCards.Add(card);
         TableView.Instance?.RefreshTable(_tableCards);
-        UIManager.Instance.ShowMessage($"打出：{card.Data.cardName}");
+        UIManager.Instance.ShowMessage($"Played: {card.Data.cardName}");
     }
-
-    // ── AI出牌 ────────────────────────────────────────────────────────────────
 
     private IEnumerator AIPlayRoutine()
     {
@@ -146,18 +128,14 @@ public class TurnManager : MonoBehaviour
 
         bool submitted = false;
 
-        // 有餐具且有食材 → 提交菜品
         if (utensils.Count > 0 && ingredients.Count >= 1)
         {
-            // 打出餐具
             PlayCardToTable(player, utensils[0]);
             yield return new WaitForSeconds(aiDelay * 0.5f);
 
-            // 打出所有食材（最多4张）
             int count = Mathf.Min(ingredients.Count, 4);
             for (int i = 0; i < count; i++)
             {
-                // 重新获取，因为手牌已变化
                 var ing = player.Hand.GetCardsByType(CardType.Ingredient);
                 if (ing.Count == 0) break;
                 PlayCardToTable(player, ing[0]);
@@ -167,12 +145,10 @@ public class TurnManager : MonoBehaviour
         }
         else if (trashCards.Count > 0)
         {
-            // 打出垃圾/功能卡
             PlayCardToTable(player, trashCards[0]);
         }
         else if (ingredients.Count > 0)
         {
-            // 随机打出一张食材
             PlayCardToTable(player, ingredients[Random.Range(0, ingredients.Count)]);
         }
 
@@ -184,8 +160,6 @@ public class TurnManager : MonoBehaviour
             EndTurn();
     }
 
-    // ── 提交阶段 ──────────────────────────────────────────────────────────────
-
     private void EnterSubmitPhase()
     {
         CurrentPhase = TurnPhase.Submit;
@@ -193,17 +167,16 @@ public class TurnManager : MonoBehaviour
         if (DishValidator.CanSubmit(_tableCards))
         {
             GameUI.Instance?.SetSubmitButton(true);
-            UIManager.Instance.ShowMessage("可以提交菜品！");
+            UIManager.Instance.ShowMessage("Ready to submit dish!");
         }
         else
         {
             GameUI.Instance?.SetSubmitButton(false);
-            UIManager.Instance.ShowMessage("桌上没有合法菜品，结束回合");
+            UIManager.Instance.ShowMessage("No valid dish, ending turn");
             EndTurn();
         }
     }
 
-    /// <summary>玩家点击"提交菜品"按钮</summary>
     public void PlayerSubmitDish()
     {
         if (CurrentPhase != TurnPhase.Submit) return;
@@ -216,7 +189,7 @@ public class TurnManager : MonoBehaviour
         int revenue = RevenueCalculator.Calculate(_tableCards, player);
         player.Revenue += revenue;
 
-        UIManager.Instance.ShowMessage($"{player.PlayerName} 提交菜品！获得 ¥{revenue}", 2.5f);
+        UIManager.Instance.ShowMessage($"{player.PlayerName} submitted! +{revenue}", 2.5f);
         UIManager.Instance.RefreshRevenue(GameManager.Instance.Players);
 
         _tableCards.Clear();
@@ -225,8 +198,6 @@ public class TurnManager : MonoBehaviour
         EndTurn();
     }
 
-    // ── 回合结束 ──────────────────────────────────────────────────────────────
-
     private void EndTurn()
     {
         GameUI.Instance?.SetPlayButtons(false);
@@ -234,7 +205,6 @@ public class TurnManager : MonoBehaviour
 
         CurrentPlayerIndex = (CurrentPlayerIndex + 1) % 4;
 
-        // 每4人一圈算一轮
         if (CurrentPlayerIndex == 0)
             GameManager.Instance.OnRoundEnd();
 
