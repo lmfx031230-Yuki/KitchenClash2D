@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 /// <summary>
 /// 运行时卡牌实例，每张实物卡对应一个CardInstance
