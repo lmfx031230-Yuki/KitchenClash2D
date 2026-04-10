@@ -7,6 +7,9 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
+    [Header("UI")]
+    [SerializeField] private HandView handView;
+
     [Header("规则")]
     [SerializeField] private int initialHandSize = 8;
     [SerializeField] private int initialRevenue = 20;
@@ -30,6 +33,8 @@ public class GameManager : MonoBehaviour
         InitPlayers();
         DeckManager.Instance.BuildAndShuffle();
         DealInitialHands();
+        handView.Init(LocalPlayer.Hand);
+        UIManager.Instance.RefreshRevenue(Players);
         TurnManager.Instance.StartGame();
     }
 
