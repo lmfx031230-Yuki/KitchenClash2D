@@ -91,7 +91,7 @@ public class TurnManager : MonoBehaviour
 
         if (IsLocalPlayerTurn)
         {
-            UIManager.Instance.ShowMessage("请出牌，或点击"结束出牌"");
+            UIManager.Instance.ShowMessage("请出牌，或点击[结束出牌]");
             GameUI.Instance?.SetPlayButtons(true);
         }
         else
