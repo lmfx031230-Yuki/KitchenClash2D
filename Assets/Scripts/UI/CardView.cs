@@ -47,7 +47,7 @@ public class CardView : MonoBehaviour, IPointerClickHandler
 
         // 数值显示
         if (data.cardType == CardType.Ingredient)
-            valueText.text = $"¥{CardInstance.GetCurrentValue()}";
+            valueText.text = $"${CardInstance.GetCurrentValue()}";
         else if (data.cardType == CardType.Utensil)
             valueText.text = "餐具";
         else
