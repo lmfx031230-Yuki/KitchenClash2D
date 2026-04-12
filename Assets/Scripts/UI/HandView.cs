@@ -2,14 +2,15 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 本地玩家手牌UI，管理CardView的生成与点击选择
+/// 本地玩家手牌UI，扇形排列
 /// </summary>
 public class HandView : MonoBehaviour
 {
     public static HandView Instance { get; private set; }
 
     [SerializeField] private GameObject cardViewPrefab;
-    [SerializeField] private Transform cardContainer;   // HorizontalLayoutGroup
+    [SerializeField] private Transform  cardContainer;
+    [SerializeField] private HandFanLayout fanLayout;
 
     private PlayerHand _hand;
     private List<CardView> _cardViews = new List<CardView>();
@@ -30,13 +31,10 @@ public class HandView : MonoBehaviour
 
     private void RefreshView()
     {
-        // 清除旧的
-        foreach (var cv in _cardViews)
-            Destroy(cv.gameObject);
+        foreach (var cv in _cardViews) Destroy(cv.gameObject);
         _cardViews.Clear();
         _selectedCard = null;
 
-        // 重新生成
         foreach (var card in _hand.Cards)
         {
             var go = Instantiate(cardViewPrefab, cardContainer);
@@ -44,16 +42,22 @@ public class HandView : MonoBehaviour
             cv.Init(card);
             _cardViews.Add(cv);
         }
+
+        ApplyFanLayout();
+    }
+
+    private void ApplyFanLayout()
+    {
+        if (fanLayout != null)
+            fanLayout.ArrangeCards(_cardViews, _selectedCard);
     }
 
     public void OnCardClicked(CardView clicked)
     {
-        // 只有本地玩家回合才能选牌
         if (!TurnManager.Instance.IsLocalPlayerTurn) return;
 
         if (_selectedCard == clicked)
         {
-            // 再次点击取消选中
             _selectedCard.SetSelected(false);
             _selectedCard = null;
         }
@@ -63,9 +67,10 @@ public class HandView : MonoBehaviour
             _selectedCard = clicked;
             _selectedCard.SetSelected(true);
         }
+
+        ApplyFanLayout();
     }
 
-    /// <summary>获取当前选中的卡，并清除选中状态</summary>
     public CardInstance ConsumeSelected()
     {
         if (_selectedCard == null) return null;
