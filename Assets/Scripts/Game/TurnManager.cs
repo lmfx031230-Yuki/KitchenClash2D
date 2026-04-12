@@ -17,8 +17,6 @@ public class TurnManager : MonoBehaviour
     private List<CardInstance> _tableCards = new List<CardInstance>();
     public IReadOnlyList<CardInstance> TableCards => _tableCards;
 
-    private bool _hasDrawnThisPhase = false;
-
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
@@ -57,7 +55,6 @@ public class TurnManager : MonoBehaviour
     private void EnterDrawPhase()
     {
         CurrentPhase = TurnPhase.Draw;
-        _hasDrawnThisPhase = false;
 
         var player = GameManager.Instance.Players[CurrentPlayerIndex];
 
