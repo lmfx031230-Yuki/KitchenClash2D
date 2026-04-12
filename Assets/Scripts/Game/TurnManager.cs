@@ -1,9 +1,12 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-public enum TurnPhase { Draw, Play, Submit, End }
+public enum TurnPhase { ChooseAction, Done }
 
+/// <summary>
+/// 回合状态机：每回合只能摸牌或打牌，二选一
+/// 打出餐具牌 = 直接上菜结算
+/// </summary>
 public class TurnManager : MonoBehaviour
 {
     public static TurnManager Instance { get; private set; }
@@ -11,11 +14,8 @@ public class TurnManager : MonoBehaviour
     [SerializeField] private float aiDelay = 1.0f;
 
     public int CurrentPlayerIndex { get; private set; } = 0;
-    public TurnPhase CurrentPhase { get; private set; } = TurnPhase.Draw;
+    public TurnPhase CurrentPhase { get; private set; } = TurnPhase.ChooseAction;
     public bool IsLocalPlayerTurn => CurrentPlayerIndex == 0;
-
-    private List<CardInstance> _tableCards = new List<CardInstance>();
-    public IReadOnlyList<CardInstance> TableCards => _tableCards;
 
     private void Awake()
     {
@@ -29,6 +29,8 @@ public class TurnManager : MonoBehaviour
         StartTurn();
     }
 
+    // ── 回合开始 ────────────────────────────────────────────────────────────────
+
     private void StartTurn()
     {
         var player = GameManager.Instance.Players[CurrentPlayerIndex];
@@ -36,57 +38,64 @@ public class TurnManager : MonoBehaviour
         if (player.SkipNextTurn)
         {
             player.SkipNextTurn = false;
-            UIManager.Instance.ShowMessage($"{player.PlayerName} skipped turn");
+            UIManager.Instance.ShowMessage($"{player.PlayerName} skipped their turn");
             EndTurn();
             return;
         }
 
-        _tableCards.Clear();
-        TableView.Instance?.RefreshTable(_tableCards);
+        CurrentPhase = TurnPhase.ChooseAction;
 
         UIManager.Instance.RefreshRoundInfo(
             GameManager.Instance.CurrentRound,
             GameManager.Instance.TotalRounds,
             player.PlayerName);
 
-        EnterDrawPhase();
+        // 手牌超限罚款（>12张）
+        if (player.Hand.Count > 12)
+        {
+            int penalty = (player.Hand.Count - 12) * 3;
+            player.Revenue -= penalty;
+            UIManager.Instance.ShowMessage($"{player.PlayerName} over hand limit! -{penalty}", 2f);
+        }
+
+        if (IsLocalPlayerTurn)
+        {
+            UIManager.Instance.ShowMessage("Draw a card or play a card");
+            GameUI.Instance?.SetActionButtons(true);
+        }
+        else
+        {
+            GameUI.Instance?.SetActionButtons(false);
+            StartCoroutine(AITurnRoutine());
+        }
     }
 
-    private void EnterDrawPhase()
+    // ── 玩家行动 ────────────────────────────────────────────────────────────────
+
+    /// <summary>玩家点"Draw Card"按钮</summary>
+    public void PlayerDrawCard()
     {
-        CurrentPhase = TurnPhase.Draw;
+        if (!IsLocalPlayerTurn || CurrentPhase != TurnPhase.ChooseAction) return;
 
-        var player = GameManager.Instance.Players[CurrentPlayerIndex];
-
+        var player = GameManager.Instance.LocalPlayer;
         var card = DeckManager.Instance.DrawCard();
         if (card != null)
         {
             player.Hand.AddCard(card);
-            UIManager.Instance.ShowMessage($"{player.PlayerName} drew a card");
-        }
-
-        EnterPlayPhase();
-    }
-
-    private void EnterPlayPhase()
-    {
-        CurrentPhase = TurnPhase.Play;
-
-        if (IsLocalPlayerTurn)
-        {
-            UIManager.Instance.ShowMessage("Play a card or click End Play");
-            GameUI.Instance?.SetPlayButtons(true);
+            UIManager.Instance.ShowMessage($"Drew: {card.Data.cardName}");
         }
         else
         {
-            GameUI.Instance?.SetPlayButtons(false);
-            StartCoroutine(AIPlayRoutine());
+            UIManager.Instance.ShowMessage("Deck is empty!");
         }
+
+        EndTurn();
     }
 
+    /// <summary>玩家点"Play Card"按钮</summary>
     public void PlayerPlayCard()
     {
-        if (!IsLocalPlayerTurn || CurrentPhase != TurnPhase.Play) return;
+        if (!IsLocalPlayerTurn || CurrentPhase != TurnPhase.ChooseAction) return;
 
         var card = HandView.Instance.ConsumeSelected();
         if (card == null)
@@ -95,117 +104,118 @@ public class TurnManager : MonoBehaviour
             return;
         }
 
-        PlayCardToTable(GameManager.Instance.LocalPlayer, card);
+        PlayCard(GameManager.Instance.LocalPlayer, card);
     }
 
-    public void PlayerEndPlay()
-    {
-        if (!IsLocalPlayerTurn || CurrentPhase != TurnPhase.Play) return;
-        EnterSubmitPhase();
-    }
-
-    private void PlayCardToTable(PlayerAgent player, CardInstance card)
+    private void PlayCard(PlayerAgent player, CardInstance card)
     {
         player.Hand.RemoveCard(card);
-        _tableCards.Add(card);
-        TableView.Instance?.RefreshTable(_tableCards);
+
+        // 打出餐具牌 = 上菜
+        if (card.Data.cardType == CardType.Utensil)
+        {
+            if (!TableManager.Instance.HasIngredient)
+            {
+                // 没有食材，餐具牌无效，放回手里
+                player.Hand.AddCard(card);
+                UIManager.Instance.ShowMessage("No ingredients on table to serve!");
+                return;
+            }
+
+            TableManager.Instance.PlayCard(card, player.PlayerId);
+            UIManager.Instance.ShowMessage($"{player.PlayerName} served the dish!");
+            RevenueCalculator.Calculate(player.PlayerId);
+            TableManager.Instance.ClearTable();
+            EndTurn();
+            return;
+        }
+
+        // 功能卡或食材卡 → 放到桌面
+        TableManager.Instance.PlayCard(card, player.PlayerId);
+
+        // 功能卡立即触发效果
+        if (card.Data.cardType == CardType.Function)
+            EffectResolver.Resolve(card, player.PlayerId);
+
         UIManager.Instance.ShowMessage($"Played: {card.Data.cardName}");
+        EndTurn();
     }
 
-    private IEnumerator AIPlayRoutine()
+    // ── AI回合 ──────────────────────────────────────────────────────────────────
+
+    private IEnumerator AITurnRoutine()
     {
         yield return new WaitForSeconds(aiDelay);
 
         var player = GameManager.Instance.Players[CurrentPlayerIndex];
-        var hand = player.Hand;
+        var hand   = player.Hand;
 
         var utensils    = hand.GetCardsByType(CardType.Utensil);
         var ingredients = hand.GetCardsByType(CardType.Ingredient);
-        var trashCards  = hand.GetCardsByType(CardType.Function);
+        var functions   = hand.GetCardsByType(CardType.Function);
 
-        bool submitted = false;
-
-        if (utensils.Count > 0 && ingredients.Count >= 1)
+        // 桌面有食材且有餐具 → 上菜
+        if (utensils.Count > 0 && TableManager.Instance.HasIngredient)
         {
-            PlayCardToTable(player, utensils[0]);
-            yield return new WaitForSeconds(aiDelay * 0.5f);
-
-            int count = Mathf.Min(ingredients.Count, 4);
-            for (int i = 0; i < count; i++)
-            {
-                var ing = player.Hand.GetCardsByType(CardType.Ingredient);
-                if (ing.Count == 0) break;
-                PlayCardToTable(player, ing[0]);
-                yield return new WaitForSeconds(aiDelay * 0.3f);
-            }
-            submitted = true;
+            PlayCard(player, utensils[0]);
+            yield break;
         }
-        else if (trashCards.Count > 0)
+
+        // 有食材 → 放食材到桌面
+        if (ingredients.Count > 0)
         {
-            PlayCardToTable(player, trashCards[0]);
+            PlayCard(player, ingredients[Random.Range(0, ingredients.Count)]);
+            yield break;
         }
-        else if (ingredients.Count > 0)
+
+        // 有功能卡 → 打功能卡
+        if (functions.Count > 0)
         {
-            PlayCardToTable(player, ingredients[Random.Range(0, ingredients.Count)]);
+            PlayCard(player, functions[0]);
+            yield break;
+        }
+
+        // 什么都没有 → 摸牌
+        var card = DeckManager.Instance.DrawCard();
+        if (card != null)
+        {
+            player.Hand.AddCard(card);
+            UIManager.Instance.ShowMessage($"{player.PlayerName} drew a card");
         }
 
         yield return new WaitForSeconds(aiDelay * 0.5f);
-
-        if (submitted)
-            SubmitDish();
-        else
-            EndTurn();
-    }
-
-    private void EnterSubmitPhase()
-    {
-        CurrentPhase = TurnPhase.Submit;
-
-        if (DishValidator.CanSubmit(_tableCards))
-        {
-            GameUI.Instance?.SetSubmitButton(true);
-            UIManager.Instance.ShowMessage("Ready to submit dish!");
-        }
-        else
-        {
-            GameUI.Instance?.SetSubmitButton(false);
-            UIManager.Instance.ShowMessage("No valid dish, ending turn");
-            EndTurn();
-        }
-    }
-
-    public void PlayerSubmitDish()
-    {
-        if (CurrentPhase != TurnPhase.Submit) return;
-        SubmitDish();
-    }
-
-    private void SubmitDish()
-    {
-        var player = GameManager.Instance.Players[CurrentPlayerIndex];
-        int revenue = RevenueCalculator.Calculate(_tableCards, player);
-        player.Revenue += revenue;
-
-        UIManager.Instance.ShowMessage($"{player.PlayerName} submitted! +{revenue}", 2.5f);
-        UIManager.Instance.RefreshRevenue(GameManager.Instance.Players);
-
-        _tableCards.Clear();
-        TableView.Instance?.RefreshTable(_tableCards);
-
         EndTurn();
     }
 
+    // ── 回合结束 ────────────────────────────────────────────────────────────────
+
     private void EndTurn()
     {
-        GameUI.Instance?.SetPlayButtons(false);
-        GameUI.Instance?.SetSubmitButton(false);
+        GameUI.Instance?.SetActionButtons(false);
+        CurrentPhase = TurnPhase.Done;
+
+        // 推进腐烂计时
+        TableManager.Instance.AdvanceRot();
+
+        // 强制结算检查
+        if (TableManager.Instance.ShouldForceSettle && TableManager.Instance.HasIngredient)
+        {
+            UIManager.Instance.ShowMessage("Dish spoiled! Force settling...", 2f);
+            RevenueCalculator.Calculate(CurrentPlayerIndex);
+            TableManager.Instance.ClearTable();
+        }
+
+        // 更新腐烂提示
+        string rotMsg = TableManager.Instance.GetRotStatus();
+        if (!string.IsNullOrEmpty(rotMsg))
+            UIManager.Instance.ShowMessage(rotMsg, 2f);
 
         CurrentPlayerIndex = (CurrentPlayerIndex + 1) % 4;
 
         if (CurrentPlayerIndex == 0)
             GameManager.Instance.OnRoundEnd();
 
-        if (GameManager.Instance.CurrentRound <= GameManager.Instance.TotalRounds)
+        if (!GameManager.Instance.IsGameOver)
             StartTurn();
     }
 }

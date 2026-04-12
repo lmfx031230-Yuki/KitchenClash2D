@@ -53,6 +53,9 @@ public class DeckManager : MonoBehaviour
         return card;
     }
 
+    /// <summary>牌堆中是否还有指定类型的牌</summary>
+    public bool HasCardOfType(CardType type) => _deck.Exists(c => c.Data.cardType == type);
+
     /// <summary>摸指定类型的牌，找不到返回null</summary>
     public CardInstance DrawCardOfType(CardType type)
     {

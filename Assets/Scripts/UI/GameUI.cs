@@ -2,16 +2,14 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 管理游戏中的按钮：打出选中牌、结束出牌、提交菜品
+/// 游戏中的两个按钮：Draw Card / Play Card
 /// </summary>
 public class GameUI : MonoBehaviour
 {
     public static GameUI Instance { get; private set; }
 
-    [Header("按钮")]
-    [SerializeField] private Button playCardButton;    // 打出选中的牌
-    [SerializeField] private Button endPlayButton;     // 结束出牌
-    [SerializeField] private Button submitDishButton;  // 提交菜品
+    [SerializeField] private Button drawCardButton;
+    [SerializeField] private Button playCardButton;
 
     private void Awake()
     {
@@ -21,22 +19,18 @@ public class GameUI : MonoBehaviour
 
     private void Start()
     {
+        drawCardButton.onClick.AddListener(TurnManager.Instance.PlayerDrawCard);
         playCardButton.onClick.AddListener(TurnManager.Instance.PlayerPlayCard);
-        endPlayButton.onClick.AddListener(TurnManager.Instance.PlayerEndPlay);
-        submitDishButton.onClick.AddListener(TurnManager.Instance.PlayerSubmitDish);
-
-        SetPlayButtons(false);
-        SetSubmitButton(false);
+        SetActionButtons(false);
     }
 
-    public void SetPlayButtons(bool active)
+    public void SetActionButtons(bool active)
     {
+        drawCardButton.interactable = active;
         playCardButton.interactable = active;
-        endPlayButton.interactable  = active;
     }
 
-    public void SetSubmitButton(bool active)
-    {
-        submitDishButton.interactable = active;
-    }
+    // 兼容旧调用
+    public void SetPlayButtons(bool active) => SetActionButtons(active);
+    public void SetSubmitButton(bool active) { }
 }
