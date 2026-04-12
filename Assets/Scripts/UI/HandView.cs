@@ -1,16 +1,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 本地玩家手牌UI，扇形排列
-/// </summary>
 public class HandView : MonoBehaviour
 {
     public static HandView Instance { get; private set; }
 
     [SerializeField] private GameObject cardViewPrefab;
     [SerializeField] private Transform  cardContainer;
-    [SerializeField] private HandFanLayout fanLayout;
 
     private PlayerHand _hand;
     private List<CardView> _cardViews = new List<CardView>();
@@ -43,13 +39,33 @@ public class HandView : MonoBehaviour
             _cardViews.Add(cv);
         }
 
-        ApplyFanLayout();
+        ArrangeCards();
     }
 
-    private void ApplyFanLayout()
+    private void ArrangeCards()
     {
-        if (fanLayout != null)
-            fanLayout.ArrangeCards(_cardViews, _selectedCard);
+        int count = _cardViews.Count;
+        if (count == 0) return;
+
+        float cardW   = 75f;
+        float overlap = 20f;   // 牌之间重叠多少
+        float spacing = cardW - overlap;
+        float totalW  = spacing * (count - 1);
+        float startX  = -totalW / 2f;
+
+        for (int i = 0; i < count; i++)
+        {
+            var rt = _cardViews[i].GetComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(cardW, 105f);
+            rt.anchoredPosition = new Vector2(startX + spacing * i,
+                _cardViews[i] == _selectedCard ? 20f : 0f);
+            rt.localRotation = Quaternion.identity;
+            rt.SetSiblingIndex(i);
+        }
+
+        // 选中牌放最上层
+        if (_selectedCard != null)
+            _selectedCard.transform.SetAsLastSibling();
     }
 
     public void OnCardClicked(CardView clicked)
@@ -68,7 +84,7 @@ public class HandView : MonoBehaviour
             _selectedCard.SetSelected(true);
         }
 
-        ApplyFanLayout();
+        ArrangeCards();
     }
 
     public CardInstance ConsumeSelected()
