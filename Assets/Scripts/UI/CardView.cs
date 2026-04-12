@@ -49,7 +49,7 @@ public class CardView : MonoBehaviour, IPointerClickHandler
         if (data.cardType == CardType.Ingredient)
             valueText.text = $"${CardInstance.GetCurrentValue()}";
         else if (data.cardType == CardType.Utensil)
-            valueText.text = "餐具";
+            valueText.text = "Utensil";
         else
             valueText.text = "";
 
