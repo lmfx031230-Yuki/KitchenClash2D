@@ -7,12 +7,12 @@ using UnityEngine;
 public class HandFanLayout : MonoBehaviour
 {
     [Header("扇形参数")]
-    [SerializeField] private float cardWidth    = 80f;
-    [SerializeField] private float cardHeight   = 110f;
-    [SerializeField] private float fanSpread    = 35f;   // 每张牌之间的角度
-    [SerializeField] private float maxAngle     = 30f;   // 最大总张角（度）
-    [SerializeField] private float arcRadius    = 800f;  // 圆弧半径（越大越平）
-    [SerializeField] private float hoverOffset  = 30f;   // 选中时上移
+    [SerializeField] private float cardWidth    = 70f;
+    [SerializeField] private float cardHeight   = 100f;
+    [SerializeField] private float fanSpread    = 12f;   // 每张牌之间的角度
+    [SerializeField] private float maxAngle     = 50f;   // 最大总张角（度）
+    [SerializeField] private float arcRadius    = 1200f; // 圆弧半径（越大越平）
+    [SerializeField] private float hoverOffset  = 40f;   // 选中时上移
 
     public void ArrangeCards(System.Collections.Generic.List<CardView> cards, CardView selected)
     {

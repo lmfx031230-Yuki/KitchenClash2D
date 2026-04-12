@@ -36,8 +36,20 @@ public class CardView : MonoBehaviour, IPointerClickHandler
     {
         var data = CardInstance.Data;
 
+        // 卡名自动缩小字体适应宽度
         cardNameText.text = data.cardName;
-        descriptionText.text = data.description;
+        cardNameText.enableAutoSizing = true;
+        cardNameText.fontSizeMin = 6;
+        cardNameText.fontSizeMax = 12;
+
+        // 描述文字只在选中时显示
+        if (descriptionText != null)
+        {
+            descriptionText.text = data.description;
+            descriptionText.enableAutoSizing = true;
+            descriptionText.fontSizeMin = 5;
+            descriptionText.fontSizeMax = 9;
+        }
 
         if (data.artwork != null)
             artworkImage.sprite = data.artwork;
