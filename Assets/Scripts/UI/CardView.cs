@@ -36,16 +36,16 @@ public class CardView : MonoBehaviour, IPointerClickHandler
     {
         var data = CardInstance.Data;
 
-        // 卡名自动缩小字体适应宽度
         cardNameText.text = data.cardName;
+        cardNameText.color = Color.black;
         cardNameText.enableAutoSizing = true;
         cardNameText.fontSizeMin = 6;
         cardNameText.fontSizeMax = 12;
 
-        // 描述文字只在选中时显示
         if (descriptionText != null)
         {
             descriptionText.text = data.description;
+            descriptionText.color = Color.black;
             descriptionText.enableAutoSizing = true;
             descriptionText.fontSizeMin = 5;
             descriptionText.fontSizeMax = 9;
@@ -57,13 +57,16 @@ public class CardView : MonoBehaviour, IPointerClickHandler
         // 背景颜色
         cardBackground.color = GetCardColor(data);
 
-        // 数值显示
-        if (data.cardType == CardType.Ingredient)
-            valueText.text = $"${CardInstance.GetCurrentValue()}";
-        else if (data.cardType == CardType.Utensil)
-            valueText.text = "Utensil";
-        else
-            valueText.text = "";
+        if (valueText != null)
+        {
+            valueText.color = Color.black;
+            if (data.cardType == CardType.Ingredient)
+                valueText.text = $"${CardInstance.GetCurrentValue()}";
+            else if (data.cardType == CardType.Utensil)
+                valueText.text = "Utensil";
+            else
+                valueText.text = "";
+        }
 
         SetSelected(false);
     }

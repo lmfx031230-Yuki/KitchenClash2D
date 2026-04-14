@@ -8,6 +8,12 @@ public class HandView : MonoBehaviour
     [SerializeField] private GameObject cardViewPrefab;
     [SerializeField] private Transform  cardContainer;
 
+    [Header("Card Layout")]
+    [SerializeField] private float cardWidth    = 70f;
+    [SerializeField] private float cardHeight   = 105f;
+    [SerializeField] private float cardSpacing  = 60f;   // center-to-center distance between cards
+    [SerializeField] private float selectedLift = 20f;   // how far selected card rises
+
     private PlayerHand _hand;
     private List<CardView> _cardViews = new List<CardView>();
     private CardView _selectedCard;
@@ -47,23 +53,19 @@ public class HandView : MonoBehaviour
         int count = _cardViews.Count;
         if (count == 0) return;
 
-        float cardW   = 75f;
-        float overlap = 20f;   // 牌之间重叠多少
-        float spacing = cardW - overlap;
-        float totalW  = spacing * (count - 1);
-        float startX  = -totalW / 2f;
+        float totalW = cardSpacing * (count - 1);
+        float startX = -totalW / 2f;
 
         for (int i = 0; i < count; i++)
         {
             var rt = _cardViews[i].GetComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(cardW, 105f);
-            rt.anchoredPosition = new Vector2(startX + spacing * i,
-                _cardViews[i] == _selectedCard ? 20f : 0f);
+            rt.sizeDelta = new Vector2(cardWidth, cardHeight);
+            rt.anchoredPosition = new Vector2(startX + cardSpacing * i,
+                _cardViews[i] == _selectedCard ? selectedLift : 0f);
             rt.localRotation = Quaternion.identity;
             rt.SetSiblingIndex(i);
         }
 
-        // 选中牌放最上层
         if (_selectedCard != null)
             _selectedCard.transform.SetAsLastSibling();
     }
