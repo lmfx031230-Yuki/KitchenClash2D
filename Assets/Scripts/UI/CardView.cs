@@ -38,17 +38,17 @@ public class CardView : MonoBehaviour, IPointerClickHandler
 
         cardNameText.text = data.cardName;
         cardNameText.color = Color.black;
-        cardNameText.enableAutoSizing = true;
-        cardNameText.fontSizeMin = 6;
-        cardNameText.fontSizeMax = 12;
+        cardNameText.enableAutoSizing = false;
+        cardNameText.fontSize = 10;
+        cardNameText.overflowMode = TMPro.TextOverflowModes.Ellipsis;
 
         if (descriptionText != null)
         {
             descriptionText.text = data.description;
             descriptionText.color = Color.black;
-            descriptionText.enableAutoSizing = true;
-            descriptionText.fontSizeMin = 5;
-            descriptionText.fontSizeMax = 9;
+            descriptionText.enableAutoSizing = false;
+            descriptionText.fontSize = 7;
+            descriptionText.overflowMode = TMPro.TextOverflowModes.Ellipsis;
         }
 
         if (data.artwork != null)
